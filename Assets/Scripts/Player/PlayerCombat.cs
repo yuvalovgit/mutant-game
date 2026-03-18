@@ -4,6 +4,9 @@ namespace MutantSurvivors
 {
     public class PlayerCombat : MonoBehaviour
     {
+        [Header("Animator")]
+        [SerializeField] private Animator animator;
+
         [Header("Projectile")]
         [SerializeField] private GameObject projectilePrefab;
         [SerializeField] private Transform firePoint;
@@ -14,7 +17,6 @@ namespace MutantSurvivors
         [Header("Interact")]
         [SerializeField] private float interactRadius = 3f;
 
-        // ── Internal state ───────────────────────────────────────────────────────
         private float fireCooldownTimer;
         private float abilityCooldownTimer;
 
@@ -25,33 +27,55 @@ namespace MutantSurvivors
         {
             playerStats     = PlayerStats.Instance;
             playerInventory = PlayerInventory.Instance;
+
+            if (animator == null)
+                animator = GetComponentInChildren<Animator>(true);
+
+            if (animator != null)
+                animator.SetBool("IsShooting", false);
+            else
+                Debug.LogError("[PlayerCombat] Animator not found!");
+
+            if (firePoint == null)
+                Debug.LogError("[PlayerCombat] FirePoint not assigned!");
+
+            if (projectilePrefab == null)
+                Debug.LogError("[PlayerCombat] ProjectilePrefab not assigned!");
         }
 
         private void Update()
         {
-            if (fireCooldownTimer    > 0f) fireCooldownTimer    -= Time.deltaTime;
+            if (fireCooldownTimer > 0f) fireCooldownTimer -= Time.deltaTime;
             if (abilityCooldownTimer > 0f) abilityCooldownTimer -= Time.deltaTime;
         }
 
-        // ── Fire ─────────────────────────────────────────────────────────────────
+        // ── Fire ───────────────────────────────────────────────────────
 
         public void TryFire()
         {
             if (fireCooldownTimer > 0f) return;
             if (projectilePrefab == null || firePoint == null) return;
 
-            fireCooldownTimer = playerStats.FireRate;
+            fireCooldownTimer = playerStats != null ? playerStats.FireRate : 0.3f;
 
             GameObject proj = Instantiate(projectilePrefab, firePoint.position, firePoint.rotation);
             Projectile p = proj.GetComponent<Projectile>();
-            p?.Initialize(firePoint.forward, playerStats.ProjectileDamage, playerStats.IgniteChance);
+            p?.Initialize(firePoint.forward, 
+                playerStats != null ? playerStats.ProjectileDamage : 10f, 
+                playerStats != null ? playerStats.IgniteChance : 0f);
         }
 
-        // ── Active Ability (HyperNovaBattery) ────────────────────────────────────
+        public void SetShooting(bool isShooting)
+        {
+            if (animator != null)
+                animator.SetBool("IsShooting", isShooting);
+        }
+
+        // ── Active Ability ─────────────────────────────────────────────
 
         public void UseActiveAbility()
         {
-            if (!playerInventory.HasItem("HyperNovaBattery")) return;
+            if (playerInventory == null || !playerInventory.HasItem("HyperNovaBattery")) return;
             if (abilityCooldownTimer > 0f) return;
 
             abilityCooldownTimer = abilityCooldown;
@@ -61,17 +85,17 @@ namespace MutantSurvivors
             {
                 EnemyBase enemy = col.GetComponent<EnemyBase>();
                 if (enemy != null)
-                    enemy.TakeDamage(playerStats.ProjectileDamage * 5f);
+                    enemy.TakeDamage(playerStats != null ? playerStats.ProjectileDamage * 5f : 50f);
             }
 
             HUDManager.Instance?.TriggerAbilityEffect();
             FloatingTextManager.Instance?.Show(
                 transform.position + Vector3.up * 2f,
-                playerStats.ProjectileDamage * 5f,
+                playerStats != null ? playerStats.ProjectileDamage * 5f : 50f,
                 Color.yellow);
         }
 
-        // ── Interact ─────────────────────────────────────────────────────────────
+        // ── Interact ───────────────────────────────────────────────────
 
         public void TryInteract()
         {
@@ -87,7 +111,7 @@ namespace MutantSurvivors
             }
         }
 
-        // ── Public helpers ───────────────────────────────────────────────────────
+        // ── Public helpers ─────────────────────────────────────────────
 
         public float AbilityCooldownRemaining => abilityCooldownTimer;
         public float AbilityCooldownTotal     => abilityCooldown;
